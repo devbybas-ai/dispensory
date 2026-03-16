@@ -116,6 +116,26 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Storefront design tokens */
+:root {
+  --sf-green: #059669;
+  --sf-green-light: #d1fae5;
+  --sf-green-dark: #064e3b;
+  --sf-indigo: #4f46e5;
+  --sf-pink: #db2777;
+  --sf-amber: #d97706;
+  --sf-purple: #7c3aed;
+  --sf-orange: #ea580c;
+  --sf-nav-blur: 12px;
+  --sf-hero-gradient-1: #059669;
+  --sf-hero-gradient-2: #4f46e5;
+  --sf-hero-gradient-3: #d97706;
+  --sf-duration-base: 200ms;
+  --sf-duration-spring: 500ms;
+  --sf-ease-base: cubic-bezier(0.4, 0, 0.2, 1);
+  --sf-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
