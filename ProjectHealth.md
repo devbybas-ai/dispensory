@@ -1,6 +1,6 @@
 # Dispensory - Project Health Summary
 
-> Last updated: 2026-03-12 | Overall Grade: **B+ (8.1)**
+> Last updated: 2026-03-16 | Overall Grade: **B+ (8.3)**
 
 ---
 
@@ -21,7 +21,7 @@
 | Tech Debt | 8.0 | B+ | -0.5 | 3 items (Prisma version, rate limiter, Zod resolver cast) |
 | Dependencies | -- | -- | -- | Audit pending |
 | Documentation | 9.0 | A | -- | Governance files current, HANDOFF comprehensive |
-| **Overall** | **8.1** | **B+** | **+0.3** | **All systems wired, needs DB connection + E2E verification** |
+| **Overall** | **8.3** | **B+** | **+0.2** | **Storefront foundation built, needs DB queries + Phase 2 (cart/checkout)** |
 
 **Scoring:** 0-10 per dimension. A+ (9.5+), A (9.0+), A- (8.5+), B+ (8.0+), B (7.0+), C+ (6.5+), C (6.0+), D (5.0+), F (<5.0).
 
@@ -31,13 +31,13 @@
 
 | Metric | Value |
 | --- | --- |
-| Source files | ~110 |
-| Lines of code | ~12,000 |
-| UI components | 16 (shadcn/ui) |
-| Layout components | 2 (AppSidebar, dashboard layout) |
+| Source files | ~130 |
+| Lines of code | ~14,500 |
+| UI components | 16 (shadcn/ui) + 8 (storefront) |
+| Layout components | 4 (AppSidebar, dashboard layout, storefront nav, storefront footer) |
 | Form components | 5 (login, license, vendor, product, form-field) |
 | API routes / endpoints | 3 (auth, upload, documents) |
-| Pages / views / routes | 8 (dashboard, compliance, inventory, POS, delivery, finance, login, unauthorized) |
+| Pages / views / routes | 11 (dashboard, compliance, inventory, POS, delivery, finance, login, unauthorized, age-verify, shop, shop/menu) |
 | Server actions | ~65 |
 | Prisma models | 33 |
 | Prisma enums | 19 |

@@ -17,21 +17,35 @@
   - Pickup and delivery fulfillment
   - Optional customer accounts with guest checkout
   - 21+ age gate (full-page branded gate, 30-day cookie)
-  - **Status: Spec approved, awaiting implementation plan**
+  - Implementation plan: `docs/superpowers/plans/2026-03-16-storefront-foundation.md`
+  - **Status: Foundation built (age gate, layout, homepage, catalog). Phase 2 needed (cart, checkout, auth).**
 
 - **VPS Deployment** — Deploy to dispensory.builtbybas.com
   - Deployment spec: `docs/superpowers/specs/2026-03-16-vps-deployment-design.md`
   - Pattern: Linux user `dispensory`, port 3006, PM2, Nginx, Certbot SSL
-  - GitHub repo: `devbybas-ai/dispensory` (private) — not yet created
+  - GitHub repo: `devbybas-ai/dispensory` (private) — pushed to `main`
   - SSH + deploy keys needed for VPS
   - Database: `dispensory` DB + `dispensory_user` on existing PostgreSQL instance
   - Next.js only (Phase 1) — Redis/BullMQ/Socket.io disabled (graceful degradation)
   - `REDIS_URL` made optional in `src/lib/env.ts` for graceful degradation
-  - **Status: Spec approved, GitHub + SSH setup pending, age gate blocks deploy**
+  - **Status: Spec approved, repo pushed, age gate implemented. SSH deploy keys still needed.**
 
 - **Code Changes Made This Session**
-  - `src/lib/env.ts` — `REDIS_URL` changed from required to optional
+  - `src/lib/env.ts` — `REDIS_URL` optional + `PREMISES_ID` added
   - `public/mockup.html` — Storefront design mockup (not production code)
+  - `.gitignore` — Added `.superpowers/` exclusion
+  - GitHub repo created and initial commit pushed (145 files)
+  - **Storefront Foundation Built (14 commits):**
+    - `prisma/schema.prisma` — 7 new enums, 4 new models, 3 model extensions
+    - `src/app/(storefront)/age-verify/` — Age gate page, server action, denial handler
+    - `src/auth.config.ts` — Three-zone routing (staff, customer, public)
+    - `src/middleware.ts` — Age gate cookie check, CSP updated for S3
+    - `src/app/(storefront)/layout.tsx` — Storefront layout with nav + footer
+    - `src/components/storefront/` — 8 components (hero, product card, effect chip, category grid, info, product grid section)
+    - `src/app/(storefront)/shop/page.tsx` — Homepage with mock data
+    - `src/app/(storefront)/shop/menu/page.tsx` — Catalog with URL-synced filters
+    - `src/types/storefront.ts` — Storefront product types
+    - `src/app/globals.css` — Storefront design tokens
 
 ### Completed (Session 4)
 
@@ -72,8 +86,8 @@
 
 - Node.js 20.18.0 is below Prisma 7's minimum (20.19+). Using Prisma 6 as workaround.
 - Next.js 16 deprecated `middleware.ts` in favor of `proxy.ts`. Current middleware still works.
-- GitHub repo not yet created — blocks VPS deployment
-- Age gate not yet implemented — blocks VPS deployment (compliance requirement)
+- ~~GitHub repo created~~ — DONE: `devbybas-ai/dispensory` pushed to `main`
+- ~~Age gate not yet implemented~~ — DONE: Full age gate with 30-day cookie, middleware redirect, denial handler
 
 ---
 
@@ -128,20 +142,20 @@
 
 ## Next Steps
 
-### Immediate (This Session)
+### Immediate (Next Session)
 
-1. Create GitHub repo (`devbybas-ai/dispensory`)
-2. Generate SSH deploy keys for VPS
-3. Create implementation plan for storefront (writing-plans skill)
-4. Begin storefront implementation
+1. Generate SSH deploy keys for VPS
+2. Create Phase 2 plan: Cart, checkout, customer auth, product detail page
+3. Replace mock data with real DB queries
+4. Add deals banner, featured brands, store bar to homepage
 
-### Priority 1: Storefront MVP
+### Priority 1: Storefront MVP — Remaining
 
-1. Age gate page + middleware
-2. Storefront layout (nav, footer, cart provider)
-3. Schema migrations (ProductMaster extensions, ProductImage, ProductEffect, Collection)
-4. Shop homepage with animated hero
-5. Product catalog with smart filters
+1. ~~Age gate page + middleware~~ — DONE
+2. ~~Storefront layout (nav, footer)~~ — DONE
+3. ~~Schema migrations~~ — DONE
+4. ~~Shop homepage with animated hero~~ — DONE
+5. ~~Product catalog with smart filters~~ — DONE
 6. Product detail page
 7. Shopping cart (slide-out + full page)
 8. Checkout flow (guest + authenticated)
@@ -150,10 +164,11 @@
 
 ### Priority 2: Deployment
 
-1. GitHub repo setup + SSH keys
-2. VPS setup (Linux user, PM2, Nginx, Certbot)
-3. DNS configuration
-4. First deploy
+1. ~~GitHub repo setup~~ — DONE
+2. SSH deploy keys for VPS
+3. VPS setup (Linux user, PM2, Nginx, Certbot)
+4. DNS configuration
+5. First deploy
 
 ### Priority 3: Polish
 
@@ -172,3 +187,4 @@
 | 3 | 2026-03-12 | Seed + UI + Domain + CI/CD | Seed script, dashboard UI (6 pages), delivery actions, finance reporting, receipt PDF, rate limit, CI/CD |
 | 4 | 2026-03-12 | DB + UI + Integrations + Hardening | Docker compose, POS cart flow, CRUD forms, search/filter, S3/Socket.io/BullMQ/Resend, E2E tests, a11y, loading skeletons |
 | 5 | 2026-03-16 | Storefront Design + Deployment Spec | Customer storefront design (tech-forward, age gate, guided discovery, cart), VPS deployment spec, REDIS_URL optional |
+| 6 | 2026-03-16 | GitHub + Storefront Foundation | GitHub repo pushed, storefront foundation built (age gate, layout, hero, product cards, catalog with filters, 8 storefront components, schema extensions) |
