@@ -35,6 +35,9 @@ const serverEnvSchema = z.object({
 
   // Socket.io
   SOCKET_PORT: z.string().optional(),
+
+  // Storefront
+  PREMISES_ID: z.string().min(1).optional(),
 });
 
 // === CLIENT ENVIRONMENT SCHEMA ===

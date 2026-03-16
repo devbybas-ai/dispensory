@@ -195,6 +195,50 @@ enum DocumentType {
   OTHER
 }
 
+enum StrainType {
+  SATIVA
+  INDICA
+  HYBRID
+}
+
+enum EffectType {
+  RELAXATION
+  FOCUS
+  PAIN_RELIEF
+  ENERGY
+  SLEEP
+  CREATIVITY
+  EUPHORIA
+}
+
+enum CollectionType {
+  STAFF_PICKS
+  POPULAR
+  DEALS
+  NEW_ARRIVALS
+  CUSTOM
+}
+
+enum OrderChannel {
+  POS
+  ONLINE
+}
+
+enum FulfillmentType {
+  PICKUP
+  DELIVERY
+}
+
+enum OnlineOrderStatus {
+  SUBMITTED
+  CONFIRMED
+  PREPARING
+  READY
+  OUT_FOR_DELIVERY
+  COMPLETED
+  CANCELLED
+}
+
 // ─────────────────────────────────────────────────────────────
 // Auth (Auth.js / NextAuth v5 compatible)
 // ─────────────────────────────────────────────────────────────
@@ -491,6 +535,13 @@ model Customer {
   phone       String?
   email       String?  @unique
 
+  // Storefront extensions
+  passwordHash  String?
+  slug          String?   @unique
+  preferences   Json?
+  emailVerified Boolean   @default(false)
+  addresses CustomerAddress[]
+
   // ID verification
   idVerified   Boolean   @default(false)
   idVerifiedAt DateTime?
@@ -508,6 +559,23 @@ model Customer {
 
   @@index([type])
   @@index([lastName, firstName])
+}
+
+model CustomerAddress {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  label          String?
+  street         String
+  unit           String?
+  city           String
+  state          String  @default("CA")
+  zip            String
+  isDefault      Boolean @default(false)
+  inDeliveryZone Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([customerId])
 }
 
 model PatientRecord {
@@ -601,6 +669,16 @@ model ProductMaster {
   unitWeight    Decimal? @db.Decimal(10, 4) // grams
   unitOfMeasure String   @default("each")   // each, gram, ounce
 
+  // Storefront
+  slug            String?         @unique
+  strainType      StrainType?
+  isPublished     Boolean         @default(false)
+  storefrontOrder Int?
+
+  images      ProductImage[]
+  effects     ProductEffect[]
+  collections CollectionProduct[]
+
   batches Batch[]
 
   createdAt DateTime  @default(now())
@@ -612,6 +690,52 @@ model ProductMaster {
   @@index([category])
   @@index([complianceStatus])
   @@index([vendorId])
+}
+
+model ProductImage {
+  id              String        @id @default(cuid())
+  productMasterId String
+  productMaster   ProductMaster @relation(fields: [productMasterId], references: [id])
+  url       String
+  alt       String?
+  sortOrder Int     @default(0)
+  isPrimary Boolean @default(false)
+  createdAt DateTime @default(now())
+  @@index([productMasterId])
+}
+
+model ProductEffect {
+  id              String        @id @default(cuid())
+  productMasterId String
+  productMaster   ProductMaster @relation(fields: [productMasterId], references: [id])
+  effect    EffectType
+  intensity Int        @default(3)
+  @@unique([productMasterId, effect])
+  @@index([effect])
+}
+
+model Collection {
+  id          String         @id @default(cuid())
+  name        String
+  slug        String         @unique
+  description String?
+  type        CollectionType
+  isActive    Boolean        @default(true)
+  sortOrder   Int            @default(0)
+  products CollectionProduct[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CollectionProduct {
+  id              String        @id @default(cuid())
+  collectionId    String
+  collection      Collection    @relation(fields: [collectionId], references: [id])
+  productMasterId String
+  productMaster   ProductMaster @relation(fields: [productMasterId], references: [id])
+  sortOrder       Int           @default(0)
+  @@unique([collectionId, productMasterId])
+  @@index([collectionId])
 }
 
 model Batch {
@@ -804,6 +928,14 @@ model Order {
   orderNumber String      @unique // Sequential per premises, e.g. "ORD-2026-00001"
   status      OrderStatus @default(DRAFT)
   type        CustomerType @default(ADULT_USE)
+
+  // Storefront extensions
+  channel         OrderChannel       @default(POS)
+  fulfillmentType FulfillmentType?
+  customerEmail   String?
+  customerPhone   String?
+  pickupTime      DateTime?
+  onlineStatus    OnlineOrderStatus?
 
   // Totals
   subtotal    Decimal @db.Decimal(10, 2) @default(0)
