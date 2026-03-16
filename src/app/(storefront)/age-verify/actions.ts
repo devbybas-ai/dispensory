@@ -3,8 +3,8 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-export const AGE_COOKIE_NAME = "age_verified";
-export const AGE_COOKIE_MAX_AGE = 30 * 24 * 60 * 60; // 30 days
+const AGE_COOKIE_NAME = "age_verified";
+const AGE_COOKIE_MAX_AGE = 30 * 24 * 60 * 60; // 30 days
 
 export async function verifyAge(returnTo?: string) {
   const cookieStore = await cookies();
@@ -18,4 +18,9 @@ export async function verifyAge(returnTo?: string) {
   });
 
   redirect(returnTo || "/shop");
+}
+
+/** Exported for testing only — not a server action */
+export async function getAgeGateConstants() {
+  return { AGE_COOKIE_NAME, AGE_COOKIE_MAX_AGE };
 }
