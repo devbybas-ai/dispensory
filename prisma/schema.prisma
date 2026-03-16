@@ -1,0 +1,1175 @@
+// Dispensory - Database Schema
+// Cannabis dispensary management platform for Southern California
+// Compliance-first: DCC, CDTFA, CCTT/Metrc, local ordinances
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  MANAGER
+  CASHIER
+  RECEIVER
+  DISPATCHER
+  SECURITY
+}
+
+enum LicenseType {
+  ADULT_USE_RETAIL
+  MEDICINAL_RETAIL
+  ADULT_USE_DELIVERY
+  MEDICINAL_DELIVERY
+  DISTRIBUTOR
+  MANUFACTURER
+  CULTIVATOR
+  TESTING_LAB
+  MICROBUSINESS
+}
+
+enum LicenseStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REVOKED
+  EXPIRED
+}
+
+enum VendorType {
+  DISTRIBUTOR
+  MANUFACTURER
+  CULTIVATOR
+  BRAND
+  SUPPLIER
+}
+
+enum ProductCategory {
+  FLOWER
+  PRE_ROLL
+  VAPE
+  CONCENTRATE
+  EDIBLE
+  TOPICAL
+  TINCTURE
+  CAPSULE
+  ACCESSORY
+}
+
+enum ComplianceStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  BLOCKED
+  RECALLED
+  ARCHIVED
+}
+
+enum TestingStatus {
+  UNTESTED
+  PENDING
+  PASSED
+  FAILED
+}
+
+enum InventoryState {
+  INBOUND
+  QUARANTINED
+  AVAILABLE
+  RESERVED
+  PACKED
+  OUT_FOR_DELIVERY
+  RETURNED
+  DESTROYED
+  RECALLED
+  EXPIRED
+}
+
+enum AdjustmentReason {
+  RECEIVED
+  SOLD
+  RETURNED_BY_CUSTOMER
+  RETURNED_TO_VENDOR
+  DAMAGED
+  EXPIRED
+  RECALLED
+  DESTROYED
+  AUDIT_CORRECTION
+  TRANSFER
+  SAMPLE
+  OTHER
+}
+
+enum CustomerType {
+  ADULT_USE
+  MEDICINAL
+}
+
+enum OrderStatus {
+  DRAFT
+  PENDING
+  PROCESSING
+  COMPLETED
+  VOIDED
+  RETURNED
+}
+
+enum PaymentMethod {
+  CASH
+  DEBIT
+  ACH
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  REFUNDED
+  FAILED
+}
+
+enum TaxType {
+  SALES_TAX
+  EXCISE_TAX
+  LOCAL_CANNABIS_TAX
+}
+
+enum ShiftStatus {
+  OPEN
+  CLOSED
+  RECONCILED
+}
+
+enum DrawerStatus {
+  OPEN
+  CLOSED
+  COUNTED
+}
+
+enum DeliveryTripStatus {
+  SCHEDULED
+  DISPATCHED
+  EN_ROUTE
+  COMPLETED
+  CANCELLED
+}
+
+enum DeliveryStopStatus {
+  PENDING
+  ARRIVED
+  DELIVERED
+  FAILED
+  REFUSED
+}
+
+enum RecallStatus {
+  INITIATED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum IncidentSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum DocumentType {
+  LICENSE
+  PERMIT
+  COA
+  MANIFEST
+  RECEIPT
+  ID_SCAN
+  PHOTO
+  OTHER
+}
+
+// ─────────────────────────────────────────────────────────────
+// Auth (Auth.js / NextAuth v5 compatible)
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  passwordHash  String
+  name          String
+  role          Role      @default(CASHIER)
+  phone         String?
+  isActive      Boolean   @default(true)
+  lastLoginAt   DateTime?
+
+  // Premises assignment
+  premisesId String?
+  premises   Premises? @relation(fields: [premisesId], references: [id])
+
+  // Auth.js relations
+  accounts Account[]
+  sessions Session[]
+
+  // Employment
+  hireDate      DateTime?
+  terminateDate DateTime?
+  employeeId    String?   @unique // Internal employee number
+
+  // Reverse relations
+  shifts        Shift[]
+  cashDrawers   CashDrawer[]
+  orders        Order[]        @relation("OrderCashier")
+  deliveryTrips DeliveryTrip[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  createdBy String?
+  updatedBy String?
+
+  @@index([premisesId])
+  @@index([role])
+  @@index([isActive])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Business & Premises
+// ─────────────────────────────────────────────────────────────
+
+model Business {
+  id        String @id @default(cuid())
+  name      String
+  legalName String
+  ein       String? @unique // Employer Identification Number
+  phone     String?
+  email     String?
+  website   String?
+
+  // Address
+  street String?
+  city   String?
+  state  String? @default("CA")
+  zip    String?
+  county String?
+
+  premises Premises[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  createdBy String?
+  updatedBy String?
+}
+
+model Premises {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id])
+
+  name   String
+  street String
+  city   String
+  state  String @default("CA")
+  zip    String
+  county String
+
+  latitude  Float?
+  longitude Float?
+
+  // Operating hours (state default: 6AM–10PM, local may be stricter)
+  opensAt  String @default("06:00") // HH:mm
+  closesAt String @default("22:00")
+  timezone String @default("America/Los_Angeles")
+
+  // Relations
+  users              User[]
+  licenses           License[]
+  localAuthorizations LocalAuthorization[]
+  localRules         LocalRule[]
+  rooms              Room[]
+  inventoryLocations InventoryLocation[]
+  orders             Order[]
+  shifts             Shift[]
+  deliveryTrips      DeliveryTrip[]
+  receivingRecords   ReceivingRecord[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  createdBy String?
+  updatedBy String?
+
+  @@index([businessId])
+  @@index([city, county])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Licensing & Compliance
+// ─────────────────────────────────────────────────────────────
+
+model License {
+  id         String        @id @default(cuid())
+  premisesId String
+  premises   Premises      @relation(fields: [premisesId], references: [id])
+
+  licenseType   LicenseType
+  licenseNumber String        @unique
+  status        LicenseStatus @default(PENDING)
+
+  issuedBy  String    // e.g. "DCC", "City of Los Angeles"
+  issuedAt  DateTime?
+  expiresAt DateTime
+  renewedAt DateTime?
+
+  // Expiration alerts
+  warningDays Int @default(90) // Days before expiry to warn
+
+  documents Document[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  createdBy String?
+  updatedBy String?
+
+  @@index([premisesId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model LocalAuthorization {
+  id         String   @id @default(cuid())
+  premisesId String
+  premises   Premises @relation(fields: [premisesId], references: [id])
+
+  authority    String        // e.g. "City of Los Angeles"
+  permitNumber String?
+  type         String        // e.g. "Cannabis Business License", "Conditional Use Permit"
+  status       LicenseStatus @default(PENDING)
+
+  issuedAt  DateTime?
+  expiresAt DateTime?
+
+  documents Document[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  createdBy String?
+  updatedBy String?
+
+  @@index([premisesId])
+}
+
+model LocalRule {
+  id         String   @id @default(cuid())
+  premisesId String
+  premises   Premises @relation(fields: [premisesId], references: [id])
+
+  jurisdiction String // e.g. "City of Los Angeles"
+  ruleKey      String // e.g. "max_operating_hours", "delivery_allowed", "local_tax_rate"
+  ruleValue    String // JSON string or simple value
+  description  String?
+
+  effectiveAt DateTime @default(now())
+  expiresAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  @@unique([premisesId, ruleKey])
+  @@index([premisesId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Facility
+// ─────────────────────────────────────────────────────────────
+
+model Room {
+  id         String   @id @default(cuid())
+  premisesId String
+  premises   Premises @relation(fields: [premisesId], references: [id])
+
+  name            String
+  type            String  // sales_floor, vault, receiving, storage, limited_access
+  isLimitedAccess Boolean @default(false)
+  hasSurveillance Boolean @default(false)
+
+  inventoryLocations InventoryLocation[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  createdBy String?
+  updatedBy String?
+
+  @@unique([premisesId, name])
+  @@index([premisesId])
+}
+
+model InventoryLocation {
+  id         String   @id @default(cuid())
+  premisesId String
+  premises   Premises @relation(fields: [premisesId], references: [id])
+  roomId     String?
+  room       Room?    @relation(fields: [roomId], references: [id])
+
+  name     String  // e.g. "Shelf A-1", "Safe #3", "Display Case 2"
+  barcode  String? @unique
+  isActive Boolean @default(true)
+
+  packages Package[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  createdBy String?
+  updatedBy String?
+
+  @@unique([premisesId, name])
+  @@index([premisesId])
+  @@index([roomId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Customer
+// ─────────────────────────────────────────────────────────────
+
+model Customer {
+  id   String       @id @default(cuid())
+  type CustomerType @default(ADULT_USE)
+
+  firstName   String
+  lastName    String
+  dateOfBirth DateTime // Age verification: 21+ adult-use, 18+ medicinal
+  phone       String?
+  email       String?  @unique
+
+  // ID verification
+  idVerified   Boolean   @default(false)
+  idVerifiedAt DateTime?
+  idType       String?   // drivers_license, passport, state_id
+  idExpiration DateTime?
+
+  patientRecord PatientRecord?
+  orders        Order[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  createdBy String?
+  updatedBy String?
+
+  @@index([type])
+  @@index([lastName, firstName])
+}
+
+model PatientRecord {
+  id         String   @id @default(cuid())
+  customerId String   @unique
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  // Medicinal verification
+  recommendationNumber String?
+  physicianName        String?
+  issuedAt             DateTime?
+  expiresAt            DateTime?
+  county               String? // County of issuance
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  createdBy String?
+  updatedBy String?
+}
+
+// ─────────────────────────────────────────────────────────────
+// Vendor / Distributor
+// ─────────────────────────────────────────────────────────────
+
+model Vendor {
+  id   String     @id @default(cuid())
+  type VendorType
+
+  name      String
+  legalName String?
+
+  // License verification
+  licenseNumber    String?
+  licenseStatus    LicenseStatus?
+  licenseExpiresAt DateTime?
+
+  // Contact
+  contactName String?
+  phone       String?
+  email       String?
+  street      String?
+  city        String?
+  state       String?
+  zip         String?
+
+  isApproved Boolean   @default(false)
+  approvedAt DateTime?
+
+  products         ProductMaster[]
+  batches          Batch[]
+  receivingRecords ReceivingRecord[]
+  documents        Document[]        @relation("VendorDocuments")
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  createdBy String?
+  updatedBy String?
+
+  @@index([type])
+  @@index([isApproved])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Product & Traceability
+// ─────────────────────────────────────────────────────────────
+
+model ProductMaster {
+  id       String          @id @default(cuid())
+  vendorId String?
+  vendor   Vendor?         @relation(fields: [vendorId], references: [id])
+
+  name        String
+  brand       String?
+  category    ProductCategory
+  description String?         @db.Text
+  sku         String?         @unique
+
+  // Compliance
+  complianceStatus ComplianceStatus @default(DRAFT)
+  requiresLabTest  Boolean          @default(true)
+  isForAdultUse    Boolean          @default(true)
+  isForMedicinal   Boolean          @default(false)
+
+  // Pricing
+  unitPrice Decimal? @db.Decimal(10, 2)
+  costPrice Decimal? @db.Decimal(10, 2)
+
+  // Packaging
+  unitWeight    Decimal? @db.Decimal(10, 4) // grams
+  unitOfMeasure String   @default("each")   // each, gram, ounce
+
+  batches Batch[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  createdBy String?
+  updatedBy String?
+
+  @@index([category])
+  @@index([complianceStatus])
+  @@index([vendorId])
+}
+
+model Batch {
+  id              String        @id @default(cuid())
+  productMasterId String
+  productMaster   ProductMaster @relation(fields: [productMasterId], references: [id])
+  vendorId        String?
+  vendor          Vendor?       @relation(fields: [vendorId], references: [id])
+
+  batchNumber       String @unique
+  manufacturingDate DateTime?
+  expirationDate    DateTime?
+
+  // Lab results / COA
+  testingStatus     TestingStatus @default(UNTESTED)
+  testedAt          DateTime?
+  labName           String?
+  coaUrl            String?
+
+  // Cannabinoid profile
+  thcPercent        Decimal? @db.Decimal(5, 2)
+  cbdPercent        Decimal? @db.Decimal(5, 2)
+  totalCannabinoids Decimal? @db.Decimal(5, 2)
+  terpeneProfile    Json?    // Structured terpene data
+
+  // Full lab results
+  passedTesting Boolean?
+  testResults   Json?
+
+  packages Package[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  createdBy String?
+  updatedBy String?
+
+  @@index([productMasterId])
+  @@index([vendorId])
+  @@index([testingStatus])
+}
+
+model Package {
+  id      String @id @default(cuid())
+  batchId String
+  batch   Batch  @relation(fields: [batchId], references: [id])
+
+  locationId String?
+  location   InventoryLocation? @relation(fields: [locationId], references: [id])
+
+  // Track and trace (CCTT / Metrc)
+  metrcUid String @unique
+
+  // Package splitting
+  parentPackageId String?
+  parentPackage   Package?  @relation("PackageSplit", fields: [parentPackageId], references: [id])
+  childPackages   Package[] @relation("PackageSplit")
+
+  // State machine
+  state InventoryState @default(INBOUND)
+
+  // Quantities
+  quantity        Decimal @db.Decimal(10, 4)
+  unitOfMeasure   String  @default("each")
+  initialQuantity Decimal @db.Decimal(10, 4)
+
+  // Packaging info
+  packageDate DateTime?
+  expiresAt   DateTime?
+  isOnHold    Boolean   @default(false)
+  holdReason  String?
+
+  // Relations
+  adjustments    InventoryAdjustment[]
+  orderLines     OrderLine[]
+  receivingLines ReceivingLine[]
+  recallItems    RecallItem[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  createdBy String?
+  updatedBy String?
+
+  @@index([batchId])
+  @@index([locationId])
+  @@index([state])
+  @@index([parentPackageId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Inventory Adjustments (reason-coded state transitions)
+// ─────────────────────────────────────────────────────────────
+
+model InventoryAdjustment {
+  id        String           @id @default(cuid())
+  packageId String
+  package   Package          @relation(fields: [packageId], references: [id])
+
+  reason AdjustmentReason
+  note   String?          @db.Text
+
+  // State change
+  fromState InventoryState?
+  toState   InventoryState
+
+  // Quantity change
+  quantityBefore Decimal @db.Decimal(10, 4)
+  quantityAfter  Decimal @db.Decimal(10, 4)
+  quantityDelta  Decimal @db.Decimal(10, 4)
+
+  // Location change
+  fromLocationId String?
+  toLocationId   String?
+
+  adjustedBy String // User ID
+
+  createdAt DateTime @default(now())
+
+  @@index([packageId])
+  @@index([reason])
+  @@index([adjustedBy])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Receiving
+// ─────────────────────────────────────────────────────────────
+
+model ReceivingRecord {
+  id         String   @id @default(cuid())
+  premisesId String
+  premises   Premises @relation(fields: [premisesId], references: [id])
+  vendorId   String
+  vendor     Vendor   @relation(fields: [vendorId], references: [id])
+
+  manifestNumber String?  @unique
+  receivedBy     String   // User ID
+  receivedAt     DateTime @default(now())
+  notes          String?  @db.Text
+
+  // Reconciliation
+  isReconciled Boolean   @default(false)
+  reconciledAt DateTime?
+
+  lines ReceivingLine[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  createdBy String?
+  updatedBy String?
+
+  @@index([premisesId])
+  @@index([vendorId])
+  @@index([receivedAt])
+}
+
+model ReceivingLine {
+  id                String          @id @default(cuid())
+  receivingRecordId String
+  receivingRecord   ReceivingRecord @relation(fields: [receivingRecordId], references: [id])
+  packageId         String
+  package           Package         @relation(fields: [packageId], references: [id])
+
+  expectedQuantity Decimal @db.Decimal(10, 4)
+  receivedQuantity Decimal @db.Decimal(10, 4)
+  accepted         Boolean @default(false)
+  rejectReason     String?
+
+  createdAt DateTime @default(now())
+
+  @@index([receivingRecordId])
+  @@index([packageId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Commerce: Orders, Lines, Tax, Payment
+// ─────────────────────────────────────────────────────────────
+
+model Order {
+  id         String   @id @default(cuid())
+  premisesId String
+  premises   Premises @relation(fields: [premisesId], references: [id])
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+  cashierId  String
+  cashier    User     @relation("OrderCashier", fields: [cashierId], references: [id])
+
+  orderNumber String      @unique // Sequential per premises, e.g. "ORD-2026-00001"
+  status      OrderStatus @default(DRAFT)
+  type        CustomerType @default(ADULT_USE)
+
+  // Totals
+  subtotal    Decimal @db.Decimal(10, 2) @default(0)
+  totalTax    Decimal @db.Decimal(10, 2) @default(0)
+  totalAmount Decimal @db.Decimal(10, 2) @default(0)
+  discount    Decimal @db.Decimal(10, 2) @default(0)
+
+  // Timestamps
+  completedAt DateTime?
+  voidedAt    DateTime?
+  voidReason  String?
+
+  lines    OrderLine[]
+  taxLines TaxLine[]
+  payments Payment[]
+
+  // Delivery (if applicable)
+  deliveryStopId String?       @unique
+  deliveryStop   DeliveryStop? @relation(fields: [deliveryStopId], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  createdBy String?
+  updatedBy String?
+
+  @@index([premisesId])
+  @@index([customerId])
+  @@index([cashierId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderLine {
+  id      String  @id @default(cuid())
+  orderId String
+  order   Order   @relation(fields: [orderId], references: [id])
+
+  packageId String
+  package   Package @relation(fields: [packageId], references: [id])
+
+  productName String
+  quantity    Decimal @db.Decimal(10, 4)
+  unitPrice   Decimal @db.Decimal(10, 2)
+  lineTotal   Decimal @db.Decimal(10, 2)
+
+  // Returns
+  returnedQuantity Decimal? @db.Decimal(10, 4)
+  returnReason     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([packageId])
+}
+
+model TaxLine {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  taxType       TaxType
+  taxRate       Decimal @db.Decimal(6, 4) // e.g. 0.0775 for 7.75%
+  taxableAmount Decimal @db.Decimal(10, 2)
+  taxAmount     Decimal @db.Decimal(10, 2)
+  description   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@index([taxType])
+}
+
+model Payment {
+  id      String        @id @default(cuid())
+  orderId String
+  order   Order         @relation(fields: [orderId], references: [id])
+
+  method PaymentMethod
+  status PaymentStatus @default(PENDING)
+  amount Decimal       @db.Decimal(10, 2)
+
+  // Cash specific
+  tendered Decimal? @db.Decimal(10, 2)
+  change   Decimal? @db.Decimal(10, 2)
+
+  // Card/ACH reference
+  transactionRef String?
+
+  processedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Shift & Cash Drawer
+// ─────────────────────────────────────────────────────────────
+
+model Shift {
+  id         String      @id @default(cuid())
+  premisesId String
+  premises   Premises    @relation(fields: [premisesId], references: [id])
+  userId     String
+  user       User        @relation(fields: [userId], references: [id])
+
+  status    ShiftStatus @default(OPEN)
+  startedAt DateTime    @default(now())
+  endedAt   DateTime?
+
+  // Reconciliation
+  expectedCash Decimal?  @db.Decimal(10, 2)
+  actualCash   Decimal?  @db.Decimal(10, 2)
+  variance     Decimal?  @db.Decimal(10, 2)
+  reconciledBy String?
+  reconciledAt DateTime?
+  notes        String?   @db.Text
+
+  cashDrawers CashDrawer[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([premisesId])
+  @@index([userId])
+  @@index([status])
+}
+
+model CashDrawer {
+  id      String       @id @default(cuid())
+  shiftId String
+  shift   Shift        @relation(fields: [shiftId], references: [id])
+  userId  String
+  user    User         @relation(fields: [userId], references: [id])
+
+  status   DrawerStatus @default(OPEN)
+  register String       // Register identifier
+
+  openingBalance Decimal  @db.Decimal(10, 2)
+  closingBalance Decimal? @db.Decimal(10, 2)
+
+  openedAt  DateTime  @default(now())
+  closedAt  DateTime?
+  countedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([shiftId])
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Delivery
+// ─────────────────────────────────────────────────────────────
+
+model DeliveryTrip {
+  id         String             @id @default(cuid())
+  premisesId String
+  premises   Premises           @relation(fields: [premisesId], references: [id])
+  driverId   String
+  driver     User               @relation(fields: [driverId], references: [id])
+
+  tripNumber String             @unique
+  status     DeliveryTripStatus @default(SCHEDULED)
+
+  // Vehicle
+  vehiclePlate String?
+  vehicleDesc  String?
+
+  // Route
+  departedAt      DateTime?
+  returnedAt      DateTime?
+  estimatedReturn DateTime?
+
+  // DCC delivery manifest
+  manifestNumber String?
+
+  stops DeliveryStop[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  createdBy String?
+  updatedBy String?
+
+  @@index([premisesId])
+  @@index([driverId])
+  @@index([status])
+}
+
+model DeliveryStop {
+  id     String             @id @default(cuid())
+  tripId String
+  trip   DeliveryTrip       @relation(fields: [tripId], references: [id])
+
+  stopNumber Int
+  status     DeliveryStopStatus @default(PENDING)
+
+  // Customer address
+  street    String
+  city      String
+  state     String @default("CA")
+  zip       String
+  latitude  Float?
+  longitude Float?
+
+  // Timing
+  estimatedAt DateTime?
+  arrivedAt   DateTime?
+  completedAt DateTime?
+
+  // Proof of delivery
+  signatureUrl String?
+  idVerified   Boolean @default(false)
+  photoUrl     String?
+  notes        String? @db.Text
+
+  order Order?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tripId])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Recall & Incidents
+// ─────────────────────────────────────────────────────────────
+
+model Recall {
+  id          String       @id @default(cuid())
+  title       String
+  description String       @db.Text
+  status      RecallStatus @default(INITIATED)
+
+  // Source
+  initiatedBy     String  // "DCC", "manufacturer", "internal"
+  referenceNumber String?
+  issuedAt        DateTime @default(now())
+  resolvedAt      DateTime?
+
+  items RecallItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  @@index([status])
+}
+
+model RecallItem {
+  id       String  @id @default(cuid())
+  recallId String
+  recall   Recall  @relation(fields: [recallId], references: [id])
+
+  packageId String
+  package   Package @relation(fields: [packageId], references: [id])
+
+  status      String    @default("pending") // pending, quarantined, returned, destroyed
+  actionTaken String?
+  actionAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([recallId])
+  @@index([packageId])
+}
+
+model Incident {
+  id          String           @id @default(cuid())
+  title       String
+  description String           @db.Text
+  severity    IncidentSeverity
+  type        String // theft, diversion, adverse_event, product_defect, compliance_violation, other
+
+  // Resolution
+  isResolved Boolean   @default(false)
+  resolvedAt DateTime?
+  resolution String?   @db.Text
+
+  reportedBy String
+  reportedAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  @@index([severity])
+  @@index([isResolved])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Documents (S3-backed file storage)
+// ─────────────────────────────────────────────────────────────
+
+model Document {
+  id          String       @id @default(cuid())
+  type        DocumentType
+  name        String
+  description String?
+  mimeType    String
+  sizeBytes   Int
+  storageKey  String // S3 key
+  storageUrl  String? // Pre-signed URL (ephemeral)
+
+  // Polymorphic ownership
+  licenseId   String?
+  license     License?            @relation(fields: [licenseId], references: [id])
+  localAuthId String?
+  localAuth   LocalAuthorization? @relation(fields: [localAuthId], references: [id])
+  vendorId    String?
+  vendor      Vendor?             @relation("VendorDocuments", fields: [vendorId], references: [id])
+
+  uploadedBy String
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([type])
+  @@index([licenseId])
+  @@index([localAuthId])
+  @@index([vendorId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Audit Trail (immutable event log)
+// ─────────────────────────────────────────────────────────────
+
+model AuditEvent {
+  id String @id @default(cuid())
+
+  // Who
+  userId    String?
+  userEmail String?
+  userRole  String?
+
+  // What
+  action   String // create, update, delete, state_change, login, void, etc.
+  entity   String // Table/model name
+  entityId String // Record ID
+
+  // Where
+  premisesId String?
+  ipAddress  String?
+  userAgent  String?
+
+  // Change data
+  before   Json? // Snapshot before change
+  after    Json? // Snapshot after change
+  metadata Json? // Additional context
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([action])
+  @@index([premisesId])
+  @@index([createdAt])
+}
