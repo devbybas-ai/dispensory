@@ -299,7 +299,7 @@ export default async function MenuPage({ searchParams }: MenuPageProps) {
         {/* Product grid */}
         <div className="mt-10">
           {filtered.length > 0 ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="flex flex-wrap justify-center gap-4 [&>*]:w-full [&>*]:sm:w-[calc(50%-0.5rem)] [&>*]:lg:w-[calc(33.333%-0.75rem)] [&>*]:xl:w-[calc(25%-0.75rem)]">
               {filtered.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
