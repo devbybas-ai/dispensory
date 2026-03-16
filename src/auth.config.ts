@@ -26,6 +26,11 @@ export const authConfig = {
       const isLoggedIn = !!auth?.user;
       const pathname = nextUrl.pathname;
 
+      // Root redirects to /shop (handled by page.tsx)
+      if (pathname === "/") {
+        return true;
+      }
+
       // Public storefront routes — no auth required
       if (isStorefrontRoute(pathname) && !isCustomerAccountRoute(pathname)) {
         return true;
@@ -43,7 +48,7 @@ export const authConfig = {
 
       // Redirect logged-in users away from login page
       if (pathname.startsWith("/login") && isLoggedIn) {
-        return Response.redirect(new URL("/", nextUrl));
+        return Response.redirect(new URL("/dashboard", nextUrl));
       }
 
       return true;
