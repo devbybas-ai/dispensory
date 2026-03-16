@@ -1,34 +1,48 @@
 import type { NextAuthConfig } from "next-auth";
 import type { Role } from "@/generated/prisma/client";
 
-// Edge-safe auth config (no Node.js-only dependencies)
-// Used by middleware for JWT session verification + route protection
-
-const publicRoutes = ["/login", "/api/auth"];
+const publicRoutes = ["/login", "/api/auth", "/age-verify", "/shop", "/api/shop"];
 
 function isPublicRoute(pathname: string): boolean {
   return publicRoutes.some((route) => pathname.startsWith(route));
 }
 
+function isStorefrontRoute(pathname: string): boolean {
+  return pathname.startsWith("/shop") || pathname.startsWith("/age-verify");
+}
+
+function isCustomerAccountRoute(pathname: string): boolean {
+  return pathname.startsWith("/shop/account");
+}
+
+export { isStorefrontRoute, isCustomerAccountRoute };
+
 export const authConfig = {
-  session: {
-    strategy: "jwt" as const,
-    maxAge: 8 * 60 * 60, // 8 hours (covers a shift)
-  },
-  pages: {
-    signIn: "/login",
-  },
-  providers: [], // Credentials provider added in auth.ts (Node.js only)
+  session: { strategy: "jwt" as const, maxAge: 8 * 60 * 60 },
+  pages: { signIn: "/login" },
+  providers: [],
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
+      const pathname = nextUrl.pathname;
 
-      if (!isPublicRoute(nextUrl.pathname) && !isLoggedIn) {
-        return false; // Redirects to pages.signIn
+      // Public storefront routes — no auth required
+      if (isStorefrontRoute(pathname) && !isCustomerAccountRoute(pathname)) {
+        return true;
+      }
+
+      // Other public routes
+      if (isPublicRoute(pathname) && !isLoggedIn) {
+        return true;
+      }
+
+      // Staff routes — require auth
+      if (!isPublicRoute(pathname) && !isLoggedIn) {
+        return false;
       }
 
       // Redirect logged-in users away from login page
-      if (nextUrl.pathname.startsWith("/login") && isLoggedIn) {
+      if (pathname.startsWith("/login") && isLoggedIn) {
         return Response.redirect(new URL("/", nextUrl));
       }
 
